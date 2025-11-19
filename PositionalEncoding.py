@@ -32,15 +32,16 @@ class PositionalEncoding(nn.Module):
         self.register_buffer('pe', pe)
 
     def forward(self, x):
-        r"""Inputs of forward function
+        r"""
         Args:
             x: the sequence fed to the positional encoder model (required).
         Shape:
-            x: [sequence length, batch size, embed dim]
-            output: [sequence length, batch size, embed dim]
-        Examples:
-            >>> output = pos_encoder(x)
+            x: [batch size, sequence length, embed dim]
+            output: [batch size, sequence length, embed dim]
         """
 
-        x = x + self.pe[:x.size(0), :]
+        # x.size(1) gives the sequence length (L)
+        # self.pe[:x.size(1), :] takes (1, L, E)
+        # x is (N, L, E)
+        x = x + self.pe[:, :x.size(1), :] 
         return self.dropout(x)
