@@ -1,0 +1,17 @@
+from lime.lime_text import LimeTextExplainer
+import numpy as np
+
+# Dummy model: predicts probability of two classes (positive class or negative class)
+# instead of dummy model here this will be model we choose 
+def dummy_predict(texts):
+    return np.array([[0.9, 0.1] if "happy" in t else [0.2, 0.8] for t in texts])
+    # if happy in text model predicts positive class with 90% probability -> no happy -> 80% negative class
+
+# Create explainer -> two classes
+explainer = LimeTextExplainer(class_names=["positive","negative"])
+
+# Explain a single instance -> in this case predict on the text below
+exp = explainer.explain_instance("I am happy as hell", dummy_predict, num_features=5)
+
+# See explanation
+print(exp.as_list())
