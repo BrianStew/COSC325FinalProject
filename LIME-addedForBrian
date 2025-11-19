@@ -1,0 +1,70 @@
+# LIME explainability to see which words impact prediction the most -> explain model predictions
+
+# imports 
+from lime.lime_text import LimeTextExplainer
+from gensim.utils import simple_preprocess
+import numpy as np
+import torch
+import os
+
+
+embedding_dim = 100 # sets dimensions of each token embedding
+max_len = X.shape[1]
+class_names = list(encoder.classes_) # class names
+
+# helper: convert list[str] -> torch tensor shaped (batch, max_len, embedding_dim)
+def texts_to_tensor(texts, word2vec_model, max_len=max_len, embedding_dim=embedding_dim, device=device):
+    
+    batch_size = len(texts)
+    # start with zeros (float32)
+    arr = np.zeros((batch_size, max_len, embedding_dim), dtype=np.float32)
+
+    for i, txt in enumerate(texts):
+        tokens = simple_preprocess(txt)  # same tokenizer used in training
+        vecs = []
+        for t in tokens:
+            if t in word2vec_model:
+                vecs.append(np.array(word2vec_model[t], dtype=np.float32))
+        # if no known tokens, give one zero-vector (so model receives something)
+        if len(vecs) == 0:
+            vecs = [np.zeros(embedding_dim, dtype=np.float32)]
+
+        # truncate to max_len and place at start of sequence
+        vecs = vecs[:max_len]
+        for j, v in enumerate(vecs):
+            arr[i, j, :] = v
+
+    # convert to torch tensor and move to device
+    tensor = torch.from_numpy(arr).to(device)
+    return tensor
+
+
+def predict_proba_for_lime(texts):
+    
+    final_model.eval()
+    X_tensor = texts_to_tensor(texts, word2vec_model, max_len=max_len, embedding_dim=embedding_dim, device=device)
+    with torch.no_grad():
+        # our model returns log_softmax, so apply exp to get probabilities
+        logits = final_model.forward(X_tensor, has_mask=False)
+        probs = torch.exp(logits)  # convert log-probs -> probs
+    return probs.cpu().numpy()
+
+
+explainer = LimeTextExplainer(class_names=class_names) # create the LIME explainer 
+
+# 5) pick a sample text to explain (change index or text as you like)
+sample_idx = 0  # explain the first kept sample by default
+sample_text = df['text'][kept_samples].reset_index(drop=True).iloc[sample_idx]
+
+# 6) run explanation
+explanation = explainer.explain_instance(sample_text,
+                                         predict_proba_for_lime,
+                                         num_features=10,
+                                         labels=(0,1,2))  # explain for all classes; change if you want subset
+
+# 7) print top contributing words for each class
+print("Top contributing tokens (word, weight) per class:")
+for class_idx, class_name in enumerate(class_names):
+    print(f"\nClass '{class_name}':")
+    # explanation.as_list(label) returns list[(token, weight), ...]
+    print(explanation.as_list(label=class_idx))
