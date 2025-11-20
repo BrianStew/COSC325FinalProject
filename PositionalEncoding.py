@@ -43,5 +43,8 @@ class PositionalEncoding(nn.Module):
         # x.size(1) gives the sequence length (L)
         # self.pe[:x.size(1), :] takes (1, L, E)
         # x is (N, L, E)
-        x = x + self.pe[:, :x.size(1), :] 
+
+        print(x.shape)
+        print(self.pe.shape)
+        x = torch.cat(x, self.pe[:, :x.size(1), :])
         return self.dropout(x)
